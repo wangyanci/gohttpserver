@@ -181,7 +181,9 @@ func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
 
 func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Request) {
 	path := mux.Vars(req)["path"]
+	path = strings.TrimRight(path, "/")
 	dirpath := filepath.Join(s.Root, path)
+	fmt.Println("path", path)
 
 	// check auth
 	auth := s.readAccessConf(path)
@@ -242,27 +244,33 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json;charset=utf-8")
-
 	if req.FormValue("unzip") == "true" {
 		err = unzipFile(dstPath, dirpath)
 		dst.Close()
 		os.Remove(dstPath)
-		message := "success"
 		if err != nil {
-			message = err.Error()
+			w.Header().Set("Content-Type", "application/json;charset=utf-8")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success":     false,
+				"description": err.Error(),
+			})
+
+			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":     err == nil,
-			"description": message,
-		})
-		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"destination": dstPath,
-	})
+	if path == "image" {//兼容typora上传图片到image目录下后对成功结果校验格式
+		w.Header().Set("Content-Type", "application/text;charset=utf-8")
+		resp := fmt.Sprintf("http:%s/%s/%s", req.Host, path, filename)
+		w.Write([]byte(resp))
+	} else {
+		w.Header().Set("Content-Type", "application/json;charset=utf-8")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":     true,
+			"destination": dstPath,
+		})
+	}
+
 }
 
 type FileJSONInfo struct {
