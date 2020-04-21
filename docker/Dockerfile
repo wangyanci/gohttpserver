@@ -1,7 +1,7 @@
 FROM golang:1.10
+ENV GO111MODULE=off
 WORKDIR /go/src/github.com/codeskyblue/gohttpserver
 ADD . /go/src/github.com/codeskyblue/gohttpserver/
-RUN go get -v
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags '-X main.VERSION=docker' -o gohttpserver
 
 FROM debian:stretch
