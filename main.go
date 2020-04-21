@@ -197,6 +197,7 @@ func main() {
 	}
 
 	fs := &webdav.Handler{
+		Prefix: "/web/dav/",
 		FileSystem: webdav.Dir(gcfg.Root),
 		LockSystem: webdav.NewMemLS(),
 	}
@@ -262,6 +263,9 @@ func main() {
 
 func handleDirList(fs webdav.FileSystem, w http.ResponseWriter, req *http.Request) bool {
 	ctx := context.Background()
+	if r := strings.TrimPrefix(req.URL.Path, "/web/dav/"); len(r) < len(req.URL.Path) {
+		return false
+	}
 	f, err := fs.OpenFile(ctx, req.URL.Path, os.O_RDONLY, 0)
 	if err != nil {
 		return false
