@@ -263,10 +263,12 @@ func main() {
 
 func handleDirList(fs webdav.FileSystem, w http.ResponseWriter, req *http.Request) bool {
 	ctx := context.Background()
-	if r := strings.TrimPrefix(req.URL.Path, "/web/dav/"); len(r) < len(req.URL.Path) {
+	r := strings.TrimPrefix(req.URL.Path, "/web/dav/")
+	if  len(r) < 0 {
 		return false
 	}
-	f, err := fs.OpenFile(ctx, req.URL.Path, os.O_RDONLY, 0)
+	fmt.Println("test.....")
+	f, err := fs.OpenFile(ctx, r, os.O_RDONLY, 0)
 	if err != nil {
 		return false
 	}
