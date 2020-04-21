@@ -21,6 +21,10 @@ import (
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	_ "github.com/shurcooL/vfsgen"
+
+
+	"golang.org/x/net/context"
+	"golang.org/x/net/webdav"
 )
 
 type Configure struct {
@@ -192,6 +196,40 @@ func main() {
 		hdlr = handlers.ProxyHeaders(hdlr)
 	}
 
+	fs := &webdav.Handler{
+		FileSystem: webdav.Dir(gcfg.Root),
+		LockSystem: webdav.NewMemLS(),
+	}
+
+	http.HandleFunc("/web/dav/", func(w http.ResponseWriter, req *http.Request) {
+		//if *flagUserName != "" && *flagPassword != "" {
+		//	username, password, ok := req.BasicAuth()
+		//	if !ok {
+		//		w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+		//		w.WriteHeader(http.StatusUnauthorized)
+		//		return
+		//	}
+		//	if username != *flagUserName || password != *flagPassword {
+		//		http.Error(w, "WebDAV: need authorized!", http.StatusUnauthorized)
+		//		return
+		//	}
+		//}
+
+		if req.Method == "GET" && handleDirList(fs.FileSystem, w, req) {
+			return
+		}
+		//webdav服务文件是否只读
+		//if *flagReadonly {
+		if false {
+			switch req.Method {
+			case "PUT", "DELETE", "PROPPATCH", "MKCOL", "COPY", "MOVE":
+				http.Error(w, "WebDAV: Read Only!!!", http.StatusForbidden)
+				return
+			}
+		}
+		fs.ServeHTTP(w, req)
+	})
+
 	http.Handle("/", hdlr)
 	http.Handle("/-/assets/", http.StripPrefix("/-/assets/", http.FileServer(Assets)))
 	http.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
@@ -218,4 +256,34 @@ func main() {
 		err = http.ListenAndServe(gcfg.Addr, nil)
 	}
 	log.Fatal(err)
+}
+
+
+
+func handleDirList(fs webdav.FileSystem, w http.ResponseWriter, req *http.Request) bool {
+	ctx := context.Background()
+	f, err := fs.OpenFile(ctx, req.URL.Path, os.O_RDONLY, 0)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	if fi, _ := f.Stat(); fi != nil && !fi.IsDir() {
+		return false
+	}
+	dirs, err := f.Readdir(-1)
+	if err != nil {
+		log.Print(w, "Error reading directory", http.StatusInternalServerError)
+		return false
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, "<pre>\n")
+	for _, d := range dirs {
+		name := d.Name()
+		if d.IsDir() {
+			name += "/"
+		}
+		fmt.Fprintf(w, "<a href=\"%s\">%s</a>\n", name, name)
+	}
+	fmt.Fprintf(w, "</pre>\n")
+	return true
 }
